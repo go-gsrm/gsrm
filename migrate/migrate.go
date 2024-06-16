@@ -1,10 +1,17 @@
 package migrate
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/go-gsrm/gsrm/utils"
 )
+
+func AutoMigrate[T any](db *sql.DB) {
+	db.Query(GenerateTableSQL[T]())
+}
 
 func IsValid[T any]() bool {
 	var target T
@@ -18,20 +25,12 @@ func GenerateTableSQL[T any]() string {
 	}
 	var structType T
 	sql := "CREATE TABLE IF NOT EXISTS "
-	valueOf := reflect.ValueOf(structType)
-	tableName := valueOf.Type().Name()
-	method := valueOf.MethodByName("TableName")
-	if method.IsValid() {
-		values := method.Call(nil)
-		if len(values) > 0 {
-			tableName = values[0].String()
-		}
-	}
+	tableName := utils.GetTableNameByInstance(structType)
 	typeOf := reflect.TypeOf(structType)
 	sql += tableName + " ("
-	fieldSQL := make([]string, 0)
+	fieldSQL := make([]string, typeOf.NumField())
 	for i := 0; i < typeOf.NumField(); i++ {
-		fieldSQL = append(fieldSQL, GenerateFieldSQL(typeOf.Field(i)))
+		fieldSQL[i] = GenerateFieldSQL(typeOf.Field(i))
 	}
 	sql += strings.Join(fieldSQL, ",")
 	sql += ") ENGINE InnoDB;"
@@ -39,9 +38,12 @@ func GenerateTableSQL[T any]() string {
 }
 
 func GenerateFieldSQL(field reflect.StructField) string {
-	typeSQL := ""
-	// unsigned := false
-	switch field.Type.Kind() {
+	return field.Name + " " + GenerateFieldTypeSQLByKind(field.Type)
+}
+
+func GenerateFieldTypeSQLByKind(t reflect.Type) (typeSQL string) {
+	notNull := true
+	switch t.Kind() {
 	case reflect.String:
 		typeSQL = "varchar(255)"
 	case reflect.Int:
@@ -58,8 +60,14 @@ func GenerateFieldSQL(field reflect.StructField) string {
 		typeSQL = "DOUBLE"
 	case reflect.Float32:
 		typeSQL = "DOUBLE"
+	case reflect.Pointer:
+		notNull = false
+		typeSQL = GenerateFieldTypeSQLByKind(t.Elem())
 	default:
 		panic("unsupported type")
 	}
-	return field.Name + " " + typeSQL
+	if !notNull {
+		typeSQL += " NOT NULL"
+	}
+	return typeSQL
 }

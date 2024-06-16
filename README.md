@@ -1,5 +1,6 @@
 # GSRM
-gsrm mean Go Struct Relational Mapping.
+GSRM mean Go Struct Relational Mapping. GSRM based on generic.
+
 # Road map
 - [ ] Auto Migrations
 - [ ] Save struct

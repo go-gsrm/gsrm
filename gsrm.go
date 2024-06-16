@@ -2,8 +2,9 @@ package gsrm
 
 import (
 	"database/sql"
-	"fmt"
+	"strings"
 
+	"github.com/go-gsrm/gsrm/utils"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -20,21 +21,22 @@ type Column struct {
 	Extra   string
 }
 
-func Open() *DB {
-	b, _ := sql.Open("mysql", "jarvis:jarvis@/jarvis?charset=utf8")
-	// b.Exec("CREATE TABLE IF NOT EXISTS hello_wolr (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255))")
-	// result, _ := b.Exec("Show Columns from fast_chat_contexts")
-	rows, _ := b.Query("Show Columns from fast_chat_contexts")
-	for rows.Next() {
-		var column Column
-		rows.Scan(&column.Field, &column.Type, &column.Null, &column.Key, &column.Default, &column.Extra)
-		fmt.Println(column)
-	}
-	return &DB{}
+func Open(driverName, dataSourceName string) *DB {
+	b, _ := sql.Open(driverName, dataSourceName)
+	return &DB{b}
 }
 
-func Insert[T any](db DB, t T) T {
-	db.Query("INSERT INTO fast_chat_contexts")
+func Insert[T any](db *DB, t T) T {
+	var structType T
+	tableName := utils.GetTableNameByInstance(structType)
+	fieldsName := utils.GetFieldsNameByInstance(structType)
+	query := "INSERT INTO " + tableName + " ("
+	query += strings.Join(fieldsName, ",")
+	placeholder := strings.Repeat("?,", len(fieldsName))
+	query += ") VALUES (" + placeholder[:len(placeholder)-1]
+	query += ")"
+
+	// db.Query(query)
 	return t
 }
 
