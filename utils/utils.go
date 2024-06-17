@@ -21,10 +21,13 @@ func GetTableNameByInstance[T any](t T) string {
 }
 
 func GetFieldsNameByInstance[T any](t T) []string {
-	typeOf := reflect.TypeOf(t)
-	fieldsName := make([]string, typeOf.NumField())
-	for i := 0; i < typeOf.NumField(); i++ {
-		fieldsName[i] = typeOf.Field(i).Name
+	return GetFieldsNameByType(reflect.TypeOf(t))
+}
+
+func GetFieldsNameByType(t reflect.Type) []string {
+	fieldsName := make([]string, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		fieldsName[i] = t.Field(i).Name
 	}
 	return fieldsName
 }

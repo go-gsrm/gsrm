@@ -2,6 +2,7 @@ package gsrm
 
 import (
 	"database/sql"
+	"reflect"
 	"strings"
 
 	"github.com/go-gsrm/gsrm/utils"
@@ -26,18 +27,21 @@ func Open(driverName, dataSourceName string) *DB {
 	return &DB{b}
 }
 
-func Insert[T any](db *DB, t T) T {
-	var structType T
-	tableName := utils.GetTableNameByInstance(structType)
-	fieldsName := utils.GetFieldsNameByInstance(structType)
+func Insert[T any](db *DB, t T) (T, error) {
+	tableName := utils.GetTableNameByInstance(t)
+	fieldsName := utils.GetFieldsNameByInstance(t)
 	query := "INSERT INTO " + tableName + " ("
 	query += strings.Join(fieldsName, ",")
 	placeholder := strings.Repeat("?,", len(fieldsName))
 	query += ") VALUES (" + placeholder[:len(placeholder)-1]
 	query += ")"
-
-	// db.Query(query)
-	return t
+	valueOf := reflect.ValueOf(t)
+	args := make([]any, valueOf.NumField())
+	for i := 0; i < valueOf.NumField(); i++ {
+		args[i] = valueOf.Field(i).Interface()
+	}
+	_, err := db.Query(query, args...)
+	return t, err
 }
 
 func InsertMany[T any](db DB, t ...T) []T {

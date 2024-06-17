@@ -16,9 +16,27 @@ func TestOpen(t *testing.T) {
 	db = Open("mysql", "jarvis:jarvis@/jarvis?charset=utf8")
 }
 
+type testInsertStruct struct {
+	ID   int
+	Name string
+	Rate float64
+	Age  *int
+}
+
 func TestInsert(t *testing.T) {
-	Insert(db, testStruct{
-		ID: 1,
+	migrate.AutoMigrate[testInsertStruct](db.DB)
+	age := 123
+	Insert(db, testInsertStruct{
+		ID:   1,
+		Name: "test",
+		Rate: 0.1,
+		Age:  &age,
+	})
+	Insert(db, testInsertStruct{
+		ID:   1,
+		Name: "test",
+		Rate: 32123,
+		Age:  nil,
 	})
 }
 

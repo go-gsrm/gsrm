@@ -2,7 +2,6 @@ package migrate
 
 import (
 	"database/sql"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -13,16 +12,7 @@ func AutoMigrate[T any](db *sql.DB) {
 	db.Query(GenerateTableSQL[T]())
 }
 
-func IsValid[T any]() bool {
-	var target T
-	fmt.Println(target)
-	return true
-}
-
 func GenerateTableSQL[T any]() string {
-	if !IsValid[T]() {
-		panic("table Invalid type")
-	}
 	var structType T
 	sql := "CREATE TABLE IF NOT EXISTS "
 	tableName := utils.GetTableNameByInstance(structType)
@@ -38,36 +28,36 @@ func GenerateTableSQL[T any]() string {
 }
 
 func GenerateFieldSQL(field reflect.StructField) string {
-	return field.Name + " " + GenerateFieldTypeSQLByKind(field.Type)
+	return field.Name + " " + GenerateFieldTypeSQLByType(field.Type)
 }
 
-func GenerateFieldTypeSQLByKind(t reflect.Type) (typeSQL string) {
-	notNull := true
-	switch t.Kind() {
+func GenerateFieldTypeSQLByType(t reflect.Type) (typeSQL string) {
+	if t.Kind() == reflect.Ptr {
+		return GenerateFieldTypeSQLByKind(t.Elem().Kind())
+	} else {
+		return GenerateFieldTypeSQLByKind(t.Kind()) + " NOT NULL"
+	}
+}
+
+func GenerateFieldTypeSQLByKind(k reflect.Kind) string {
+	switch k {
 	case reflect.String:
-		typeSQL = "varchar(255)"
+		return "varchar(255)"
 	case reflect.Int:
-		typeSQL = "bigint"
+		return "bigint"
 	case reflect.Int32:
-		typeSQL = "bigint"
+		return "bigint"
 	case reflect.Int64:
-		typeSQL = "bigint"
+		return "bigint"
 	case reflect.Bool:
-		typeSQL = "BOOLEAN"
+		return "BOOLEAN"
 	case reflect.Uint:
-		typeSQL = "int unsigned"
+		return "int unsigned"
 	case reflect.Float64:
-		typeSQL = "DOUBLE"
+		return "DOUBLE"
 	case reflect.Float32:
-		typeSQL = "DOUBLE"
-	case reflect.Pointer:
-		notNull = false
-		typeSQL = GenerateFieldTypeSQLByKind(t.Elem())
+		return "DOUBLE"
 	default:
 		panic("unsupported type")
 	}
-	if !notNull {
-		typeSQL += " NOT NULL"
-	}
-	return typeSQL
 }
