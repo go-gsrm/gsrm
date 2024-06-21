@@ -22,6 +22,13 @@ func GenerateTableSQL[T any]() string {
 	for i := 0; i < typeOf.NumField(); i++ {
 		fieldSQL[i] = GenerateFieldSQL(typeOf.Field(i))
 	}
+	primaryKeys := utils.GetPrimaryKeyColumnsByType(typeOf)
+	if len(primaryKeys) > 0 {
+		primaryKeySql := "PRIMARY KEY ("
+		primaryKeySql += strings.Join(primaryKeys, ",")
+		primaryKeySql += ")"
+		fieldSQL = append(fieldSQL, primaryKeySql)
+	}
 	sql += strings.Join(fieldSQL, ",")
 	sql += ") ENGINE InnoDB;"
 	return sql

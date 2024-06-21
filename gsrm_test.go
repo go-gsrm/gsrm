@@ -26,13 +26,13 @@ type testInsertStruct struct {
 func TestInsert(t *testing.T) {
 	migrate.AutoMigrate[testInsertStruct](db.DB)
 	age := 123
-	Insert(db, testInsertStruct{
+	Insert(db.DB, testInsertStruct{
 		ID:   1,
 		Name: "test",
 		Rate: 0.1,
 		Age:  &age,
 	})
-	Insert(db, testInsertStruct{
+	Insert(db.DB, testInsertStruct{
 		ID:   1,
 		Name: "test",
 		Rate: 32123,

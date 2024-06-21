@@ -1,6 +1,9 @@
 package utils
 
-import "reflect"
+import (
+	"reflect"
+	"regexp"
+)
 
 func GetTableName[T any]() string {
 	var structType T
@@ -30,4 +33,21 @@ func GetFieldsNameByType(t reflect.Type) []string {
 		fieldsName[i] = t.Field(i).Name
 	}
 	return fieldsName
+}
+
+func GetTag(t reflect.StructField) string {
+	return t.Tag.Get("gsrm")
+}
+
+func GetPrimaryKeyColumnsByType(t reflect.Type) []string {
+	var primaryKey []string
+	reg, _ := regexp.Compile(".*primaryKey.*")
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := GetTag(field)
+		if reg.Match([]byte(tag)) {
+			primaryKey = append(primaryKey, field.Name)
+		}
+	}
+	return primaryKey
 }
