@@ -3,6 +3,7 @@ package utils
 import (
 	"reflect"
 	"regexp"
+	"strings"
 )
 
 func GetTableName[T any]() string {
@@ -21,6 +22,11 @@ func GetTableNameByInstance[T any](t T) string {
 		}
 	}
 	return tableName
+}
+
+func GetFieldsName[T any]() []string {
+	var structType T
+	return GetFieldsNameByInstance(structType)
 }
 
 func GetFieldsNameByInstance[T any](t T) []string {
@@ -50,4 +56,35 @@ func GetPrimaryKeyColumnsByType(t reflect.Type) []string {
 		}
 	}
 	return primaryKey
+}
+
+func GetPlaceholder[T any]() string {
+	var structType T
+	return GetPlaceholderByInstance(structType)
+}
+
+func GetPlaceholderByInstance[T any](t T) string {
+	fieldsName := GetFieldsNameByInstance(t)
+	placeholder := strings.Repeat("?,", len(fieldsName))
+	return "(" + placeholder[:len(placeholder)-1] + ")"
+}
+
+func GetArgsByValueOf(valueOf reflect.Value) []any {
+	args := make([]any, valueOf.NumField())
+	for i := 0; i < valueOf.NumField(); i++ {
+		args[i] = valueOf.Field(i).Interface()
+	}
+	return args
+}
+
+func ExecBeforeInsert[T any](data T) (T, error) {
+	valueOf := reflect.ValueOf(data)
+	method := valueOf.MethodByName("GsrmBeforeInsert")
+	if method.IsValid() {
+		// TODO: error handling
+		results := method.Call(nil)
+		newData := results[0].Interface()
+		data = newData.(T)
+	}
+	return data, nil
 }

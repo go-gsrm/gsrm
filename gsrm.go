@@ -3,10 +3,10 @@ package gsrm
 import (
 	"database/sql"
 	"reflect"
-	"strings"
 
 	"github.com/go-gsrm/gsrm/utils"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/huandu/go-sqlbuilder"
 )
 
 type DB struct {
@@ -33,7 +33,7 @@ func (db *GDB[T]) Insert(data T) (T, error) {
 	return Insert(db.DB, data)
 }
 
-func (db *GDB[T]) InsertMany(data ...T) []T {
+func (db *GDB[T]) InsertMany(data ...T) ([]T, error) {
 	return InsertMany(db.DB, data...)
 }
 
@@ -52,41 +52,35 @@ func Open(driverName, dataSourceName string) *DB {
 }
 
 func Insert[T any](db *sql.DB, data T) (T, error) {
-	tableName := utils.GetTableNameByInstance(data)
-	fieldsName := utils.GetFieldsNameByInstance(data)
-	valueOf := reflect.ValueOf(data)
-	method := valueOf.MethodByName("GsrmBeforeInsert")
-	if method.IsValid() {
-		// TODO: error handling
-		results := method.Call(nil)
-		newData := results[0].Interface()
-		data = newData.(T)
-	}
-	valueOf = reflect.ValueOf(data)
-	query := "INSERT INTO " + tableName + " ("
-	query += strings.Join(fieldsName, ",")
-	placeholder := strings.Repeat("?,", len(fieldsName))
-	query += ") VALUES (" + placeholder[:len(placeholder)-1]
-	query += ")"
-	args := make([]any, valueOf.NumField())
-	for i := 0; i < valueOf.NumField(); i++ {
-		args[i] = valueOf.Field(i).Interface()
-	}
-	result, err := db.Exec(query, args...)
-	if err != nil {
-		return data, err
-	}
-	_, err = result.LastInsertId()
+	data, _ = utils.ExecBeforeInsert(data)
+	builder := generateSQLBuilderByInstence(data)
+	builder.Values(generateValuesByInstence(data)...)
+	sql, args := builder.Build()
+	_, err := db.Exec(sql, args...)
 	if err != nil {
 		return data, err
 	}
 	return data, err
 }
 
-func InsertMany[T any](db *sql.DB, data ...T) []T {
-
-	db.Query("INSERT INTO fast_chat_contexts")
-	return data
+func InsertMany[T any](db *sql.DB, dataList ...T) ([]T, error) {
+	var err error
+	if len(dataList) == 0 {
+		return dataList, nil
+	}
+	builder := generateSQLBuilderByInstence(dataList[0])
+	output := make([]T, len(dataList))
+	for i, data := range dataList {
+		data, err = utils.ExecBeforeInsert(data)
+		if err != nil {
+			return dataList, err
+		}
+		builder.Values(generateValuesByInstence(data)...)
+		output[i] = data
+	}
+	sql, args := builder.Build()
+	_, err = db.Exec(sql, args...)
+	return output, err
 }
 
 func First[T any](db *sql.DB) T {
@@ -123,4 +117,25 @@ type Repostitory[T any] struct {
 func (r Repostitory[T]) Insert(t T) T {
 	r.DB.Query("INSERT INTO fast_chat_contexts")
 	return t
+}
+
+func generateSQLBuilderByInstence[T any](data T) *sqlbuilder.InsertBuilder {
+	builder := sqlbuilder.NewInsertBuilder()
+	builder.InsertInto(utils.GetTableNameByInstance(data))
+	typeOf := reflect.TypeOf(data)
+	var cloumnsName []string = make([]string, 0)
+	for i := 0; i < typeOf.NumField(); i++ {
+		cloumnsName = append(cloumnsName, typeOf.Field(i).Name)
+	}
+	builder.Cols(cloumnsName...)
+	return builder
+}
+
+func generateValuesByInstence[T any](data T) []interface{} {
+	valueOf := reflect.ValueOf(data)
+	var values []interface{} = make([]interface{}, 0)
+	for i := 0; i < valueOf.NumField(); i++ {
+		values = append(values, valueOf.Field(i).Interface())
+	}
+	return values
 }

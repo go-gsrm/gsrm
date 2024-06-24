@@ -8,8 +8,9 @@ import (
 	"github.com/go-gsrm/gsrm/utils"
 )
 
-func AutoMigrate[T any](db *sql.DB) {
-	db.Query(GenerateTableSQL[T]())
+func AutoMigrate[T any](db *sql.DB) error {
+	_, err := db.Exec(GenerateTableSQL[T]())
+	return err
 }
 
 func GenerateTableSQL[T any]() string {
