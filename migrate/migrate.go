@@ -2,10 +2,12 @@ package migrate
 
 import (
 	"database/sql"
+	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/go-gsrm/gsrm/utils"
+	"github.com/huandu/go-sqlbuilder"
 )
 
 func AutoMigrate[T any](db *sql.DB) error {
@@ -15,57 +17,16 @@ func AutoMigrate[T any](db *sql.DB) error {
 
 func GenerateTableSQL[T any]() string {
 	var structType T
-	sql := "CREATE TABLE IF NOT EXISTS "
-	tableName := utils.GetTableNameByInstance(structType)
+	builder := sqlbuilder.CreateTable(utils.GetTableNameByInstance(structType)).
+		IfNotExists()
 	typeOf := reflect.TypeOf(structType)
-	sql += tableName + " ("
-	fieldSQL := make([]string, typeOf.NumField())
-	for i := 0; i < typeOf.NumField(); i++ {
-		fieldSQL[i] = GenerateFieldSQL(typeOf.Field(i))
+	for _, fieldProperty := range utils.GetFieldPropertiesByType(typeOf) {
+		builder.Define(fieldProperty.Define()...)
 	}
-	primaryKeys := utils.GetPrimaryKeyColumnsByType(typeOf)
-	if len(primaryKeys) > 0 {
-		primaryKeySql := "PRIMARY KEY ("
-		primaryKeySql += strings.Join(primaryKeys, ",")
-		primaryKeySql += ")"
-		fieldSQL = append(fieldSQL, primaryKeySql)
+	if primaryKeys := utils.GetPrimaryKeyColumnsByType(typeOf); len(primaryKeys) > 0 {
+		builder.Define("PRIMARY KEY", "("+strings.Join(primaryKeys, ",")+")")
 	}
-	sql += strings.Join(fieldSQL, ",")
-	sql += ") ENGINE InnoDB;"
+	sql, _ := builder.Build()
+	fmt.Println(sql)
 	return sql
-}
-
-func GenerateFieldSQL(field reflect.StructField) string {
-	return field.Name + " " + GenerateFieldTypeSQLByType(field.Type)
-}
-
-func GenerateFieldTypeSQLByType(t reflect.Type) (typeSQL string) {
-	if t.Kind() == reflect.Ptr {
-		return GenerateFieldTypeSQLByKind(t.Elem().Kind())
-	} else {
-		return GenerateFieldTypeSQLByKind(t.Kind()) + " NOT NULL"
-	}
-}
-
-func GenerateFieldTypeSQLByKind(k reflect.Kind) string {
-	switch k {
-	case reflect.String:
-		return "varchar(255)"
-	case reflect.Int:
-		return "bigint"
-	case reflect.Int32:
-		return "bigint"
-	case reflect.Int64:
-		return "bigint"
-	case reflect.Bool:
-		return "BOOLEAN"
-	case reflect.Uint:
-		return "int unsigned"
-	case reflect.Float64:
-		return "DOUBLE"
-	case reflect.Float32:
-		return "DOUBLE"
-	default:
-		panic("unsupported type")
-	}
 }

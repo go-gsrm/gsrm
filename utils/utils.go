@@ -1,15 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 )
-
-func GetTableName[T any]() string {
-	var structType T
-	return GetTableNameByInstance(structType)
-}
 
 func GetTableNameByInstance[T any](t T) string {
 	valueOf := reflect.ValueOf(t)
@@ -21,12 +17,7 @@ func GetTableNameByInstance[T any](t T) string {
 			tableName = values[0].String()
 		}
 	}
-	return tableName
-}
-
-func GetFieldsName[T any]() []string {
-	var structType T
-	return GetFieldsNameByInstance(structType)
+	return strings.ToLower(tableName)
 }
 
 func GetFieldsNameByInstance[T any](t T) []string {
@@ -36,9 +27,41 @@ func GetFieldsNameByInstance[T any](t T) []string {
 func GetFieldsNameByType(t reflect.Type) []string {
 	fieldsName := make([]string, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
-		fieldsName[i] = t.Field(i).Name
+		fieldsName[i] = GetFieldName(t.Field(i))
 	}
 	return fieldsName
+}
+
+func GetFieldPropertiesByType(t reflect.Type) []FieldProperty {
+	fieldProperties := make([]FieldProperty, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		fieldProperties[i] = GetFieldProperty(t.Field(i))
+	}
+	return fieldProperties
+}
+
+func GetFieldProperty(t reflect.StructField) FieldProperty {
+	return FieldProperty{
+		Name: GetFieldName(t),
+		Type: GenerateFieldTypeSQLByKind(t.Type.Kind()),
+	}
+}
+
+func GetFieldName(t reflect.StructField) string {
+	return t.Name
+}
+
+func GetTagValue(t reflect.StructField, key string) string {
+	tag := GetTag(t)
+	fmt.Println(tag)
+	reg, _ := regexp.Compile(".*" + key + ":(.*);")
+	fmt.Println(reg.FindStringSubmatch(tag))
+	return ""
+	// return reg.FindStringSubmatch(tag)[1]
+}
+
+func GetTagType(t reflect.StructField) string {
+	return GetTagValue(t, "type")
 }
 
 func GetTag(t reflect.StructField) string {
@@ -47,15 +70,19 @@ func GetTag(t reflect.StructField) string {
 
 func GetPrimaryKeyColumnsByType(t reflect.Type) []string {
 	var primaryKey []string
-	reg, _ := regexp.Compile(".*primaryKey.*")
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		tag := GetTag(field)
-		if reg.Match([]byte(tag)) {
-			primaryKey = append(primaryKey, field.Name)
+		if IsPromaryKey(field) {
+			primaryKey = append(primaryKey, GetFieldName(field))
 		}
 	}
 	return primaryKey
+}
+
+func IsPromaryKey(field reflect.StructField) bool {
+	reg, _ := regexp.Compile(".*primaryKey.*")
+	tag := GetTag(field)
+	return reg.Match([]byte(tag))
 }
 
 func GetPlaceholder[T any]() string {
@@ -64,8 +91,7 @@ func GetPlaceholder[T any]() string {
 }
 
 func GetPlaceholderByInstance[T any](t T) string {
-	fieldsName := GetFieldsNameByInstance(t)
-	placeholder := strings.Repeat("?,", len(fieldsName))
+	placeholder := strings.Repeat("?,", len(GetFieldsNameByInstance(t)))
 	return "(" + placeholder[:len(placeholder)-1] + ")"
 }
 
@@ -87,4 +113,35 @@ func ExecBeforeInsert[T any](data T) (T, error) {
 		data = newData.(T)
 	}
 	return data, nil
+}
+
+func GenerateFieldTypeSQLByType(t reflect.Type) (typeSQL string) {
+	if t.Kind() == reflect.Ptr {
+		return GenerateFieldTypeSQLByKind(t.Elem().Kind())
+	} else {
+		return GenerateFieldTypeSQLByKind(t.Kind()) + " NOT NULL"
+	}
+}
+
+func GenerateFieldTypeSQLByKind(k reflect.Kind) string {
+	switch k {
+	case reflect.String:
+		return "varchar(255)"
+	case reflect.Int:
+		return "bigint"
+	case reflect.Int32:
+		return "bigint"
+	case reflect.Int64:
+		return "bigint"
+	case reflect.Bool:
+		return "BOOLEAN"
+	case reflect.Uint:
+		return "int unsigned"
+	case reflect.Float64:
+		return "DOUBLE"
+	case reflect.Float32:
+		return "DOUBLE"
+	default:
+		panic("unsupported type")
+	}
 }
